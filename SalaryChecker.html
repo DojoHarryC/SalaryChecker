@@ -1,0 +1,636 @@
+<!-- Made By Harry Cardew, Harry.cardew@auticon.co.uk
+
+Please use your own API keys as any left are for deactivated test accounts-->
+
+<!doctype html>
+
+<html lang="en">
+
+<head>
+
+                <meta charset="utf-8">
+
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+
+                <title>Salary Checker</title>
+
+                <script
+
+                  src=https://code.jquery.com/jquery-3.7.1.js
+
+                  integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+
+                  crossorigin="anonymous"></script>
+
+                 
+
+                <script src=https://code.jquery.com/ui/1.13.2/jquery-ui.js></script>
+
+                <style>
+
+                                .IndentText{
+
+                                                TEXT-INDENT: 3%;
+
+                                }
+
+                                #ReturnForm{
+
+                                  visibility: hidden;
+
+                                  display:grid;
+
+                                }
+
+                                #ErrorText{
+
+                                  visibility: hidden;
+
+                                }
+
+                </style>
+
+                <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+
+                <script>
+
+                                /*
+
+                                Please move all linked and html css/js into external files if possible as told to keep on 1 html page
+
+                                */
+
+                                $( function() {
+
+                                                $( "#accordion" ).accordion({
+
+                                                  collapsible: true
+
+                                                });
+
+                                                $( "#ReturnForm" ).accordion({
+
+                                                  collapsible: true,
+
+                                                  heightStyle: "content"
+
+                                                });
+
+                                                var date = new Date();
+
+ 
+
+                                                var day = date.getDate();
+
+                                                var month = date.getMonth() + 1;
+
+                                                var year = date.getFullYear();
+
+ 
+
+                                                if (month < 10) month = "0" + month;
+
+                                                if (day < 10) day = "0" + day;
+
+ 
+
+                                                var today = year + "-" + month + "-" + day;      
+
+                                                $("#SubmissionDate").attr("value", today);
+
+                                } );
+
+                               
+
+                                async function SubmitSalaryMain(){
+
+                                                var SubmissionDate = $("#SubmissionDate").val();
+
+                                                var Salary = $("#Salary").val();
+
+                                                var Postcode = $("#Postcode").val();
+
+                                                console.log("FunctionStart");                                    
+
+                                                var Errorcheck = Validation(SubmissionDate,Salary,Postcode);
+
+                                                if(Errorcheck !=null || Errorcheck!=""){
+
+                                                               
+
+                                                                var locationDataReturn = await GetLocationData(Postcode);
+
+                                                                var Country = ""
+
+                                                                if(locationDataReturn.result.country == "England" || locationDataReturn.result.country == "Scotland" || locationDataReturn.result.country == "Wales"){
+
+                                                                                Country = "united kingdom" ;
+
+                                                                }
+
+                                                                else{                                                      
+
+                                                                                Country = locationDataReturn.result.country;
+
+                                                                }
+
+                                                                console.log(locationDataReturn);
+
+                                                                var LocationRegion = locationDataReturn.result.region;
+
+                                               
+
+                                                                var Inflation = await CheckInflation(Country);
+
+                                                                console.log("Inflation");
+
+                                                                console.log(Inflation);
+
+                                                               
+
+                                                                $("#ReturnInflation").html(""+Inflation[0].monthly_rate_pct+"%");
+
+                                                               
+
+                                                                var AfterTax = await DeductionTax(SubmissionDate,Salary,Country);
+
+                                                                console.log("AfterTax");
+
+                                                                console.log(AfterTax);
+
+                                                               
+
+                                                                var RentInformation = await DeductRent(LocationRegion);
+
+                                                               
+
+                                                                console.log("RentInformation");
+
+                                                                console.log(RentInformation);
+
+                                                               
+
+                                                                var AfterRentCost = AfterTax.MonthlyIncome -RentInformation.cost;
+
+                                                                var InflationLose =  PercentageAmount(AfterRentCost,Inflation[0].monthly_rate_pct)
+
+                                                                console.log("InflationLose");
+
+                                                                console.log(InflationLose);
+
+                                                                var PredictedLoseTotal = AfterRentCost - InflationLose;
+
+                                                                $("#ReturnPreTax").html("£"+Salary+"");
+
+                                                               
+
+                                                                $("#ReturnAfterTax").html(
+
+                                                                                "<p class='IndentText'>Yearly Income-tax £"+AfterTax.DeductionIncomeTaxYearly +"</p>"+
+
+                                                                                "<p class='IndentText'>Yearly National Insurance £"+AfterTax.DeductionNITax +"</p>"+
+
+                                                                                "<p class='IndentText'>Additional Tax Charges £"+AfterTax.DeductionAddiations +"</p>"+
+
+                                                                                "<p class='IndentText'>Yearly Income After Salary Deduction £"+AfterTax.YearlyAfterSalaryDeduction +"</p>"+
+
+                                                                                "<p class='IndentText'>Monthly Income After Salary Deduction £"+AfterTax.MonthlyIncome +"</p>");
+
+                                                                               
+
+                                                                $("#ReturnAfterRent").html("<P class='IndentText'>Average Rent Cost: "+ RentInformation.cost+" at "+LocationRegion+"</P>"+
+
+                                                                                                                                                                                "<p class='IndentText'>Monthly total After Rent £"+AfterRentCost+"</p>")
+
+                                                                $("#ReturnPrediction").html("£"+PredictedLoseTotal+"")
+
+                                                                $('#ReturnForm').css('visibility','visible')
+
+                                                                $('#ErrorText').css('visibility', 'hidden')
+
+                                                }
+
+                                                else{
+
+                                                ErrorText
+
+                                                                $("#ErrorText").val(Errorcheck);
+
+                                                                $('#ErrorText').css('visibility', 'visible')
+
+                                                                $('#ReturnForm').css('visibility','hidden')
+
+                                                }
+
+                                }
+
+                               
+
+                                function Validation(SubmissionDate,Salary,Postcode){
+
+                               
+
+                                                ErrorText = ""
+
+                                                var UKPostcode = new RegExp("^([A-Za-z][A-Ha-hJ-Yj-y]?[0-9][A-Za-z0-9]? ?[0-9][A-Za-z]{2}|[Gg][Ii][Rr] ?0[Aa]{2})$");
+
+                                                if (!UKPostcode.test(Postcode)){
+
+                                                                ErrorText += "<p>Invalid UK Postcode</p>"
+
+                                                }
+
+                                                /*if (Country != "United Kingdom"){
+
+                                                ErrorText += "<p>Presently the only country this works for is the 'United Kingdom'</p>"
+
+                                                }*/
+
+                                                if (Salary!= null || Salary!=0){
+
+                                                ErrorText += "<p>Please input a salary figure</p>"
+
+                                                }
+
+                                               
+
+                                }
+
+                                async function CheckInflation(Country){
+
+                                                var returnInflation=null;
+
+                                                await $.ajax({
+
+                                                                method: 'GET',
+
+                                                                async : true,
+
+                                                                url: 'https://api.api-ninjas.com/v1/inflation?country=' + Country,
+
+                                                                headers: { 'X-Api-Key': 'bNphm6d+fLLOQOFCndO9Tg==pLIgWHznOKfUNRKd'},
+
+                                                                contentType: 'application/json',
+
+                                                                success: function(result) {
+
+                                                                                returnInflation = result;
+
+                                                                },
+
+                                                                error: function ajaxError(jqXHR) {
+
+                                                                                alert('Error: ', jqXHR.responseText);
+
+                                                                }
+
+                                                });
+
+                                                return returnInflation;
+
+                                }
+
+                                async function DeductionTax(SubmissionDate,YearlySalary,Country){
+
+                               
+
+                                                console.log("Deduction");
+
+                                                let incomeTax = 0;
+
+                                                let NITax = 0
+
+                                                let Additions =0;
+
+                                                //Average Income tax 2023
+
+                                                if(YearlySalary <5000){
+
+                                                                incomeTax = 0;
+
+                                                }
+
+                                                else if(YearlySalary <37700){
+
+                                                                incomeTax = 20;
+
+                                                }
+
+                                                else if(YearlySalary <150000){
+
+                                                                incomeTax = 40;
+
+                                                }
+
+                                                else if(YearlySalary >150000){
+
+                                                                incomeTax = 45;
+
+                                                }
+
+                                                // NI tax rates 2023
+
+                                                if(YearlySalary <12570){
+
+                                                                NITax = 0;
+
+                                                }
+
+                                                else if(YearlySalary >12570){
+
+                                                                NITax = 12;
+
+                                                }
+
+                                                else if(YearlySalary >50270){
+
+                                                                NITax = 12;
+
+                                                                Additions=2;
+
+                                                }
+
+                                               
+
+                                                console.log("incomeTax: " +incomeTax + " NITax: " +NITax +" Additions: " +Additions)
+
+                                                let DeductionIncomeTaxYearly = PercentageAmount(YearlySalary,incomeTax)
+
+                                                let DeductionNITax = PercentageAmount(YearlySalary,NITax)
+
+                                                let DeductionAddiations = PercentageAmount(YearlySalary,Additions)
+
+                                                let YearlySalaryDeduction = YearlySalary - DeductionIncomeTaxYearly - DeductionNITax - DeductionAddiations
+
+                                                let MonthlyIncome = YearlySalaryDeduction/12;
+
+ 
+
+                                                var ReturnedSummary = {
+
+                                                                DeductionIncomeTaxYearly:  DeductionIncomeTaxYearly.toFixed(2),
+
+                                                                DeductionNITax: DeductionNITax.toFixed(2),
+
+                                                                DeductionAddiations: DeductionAddiations.toFixed(2),
+
+                                                                YearlyAfterSalaryDeduction: YearlySalaryDeduction.toFixed(2),
+
+                                                                MonthlyIncome:MonthlyIncome.toFixed(2)
+
+                                                };
+
+                                                console.log(ReturnedSummary);
+
+                                                return ReturnedSummary;
+
+                                                /*Costs money for api calls
+
+                                                var api_key = 'demo_mud8y7yhbsydug';
+
+                                                $.get(https://www.income-tax.co.uk/api/'+api_key+'/ + Salary + "/", function (data) {
+
+                                                                                                // data is the returned results, do whatever you want with it
+
+                                                                                                console.log(data);
+
+                                                                                })
+
+                                                                                .done(function () {
+
+                                                                                                //alert( "second success" );
+
+                                                                                })
+
+                                                                                .fail(function (function( jqXHR, textStatus, errorThrown ) {
+
+                                                                                                console.log(jqXHR);
+
+                                                                                                console.log(textStatus);
+
+                                                                                                console.log(errorThrown );
+
+                                                                                })
+
+                                                                                .always(function () {
+
+                                                                                                //alert( "finished" );
+
+                                                                                });*/
+
+                                }
+
+ 
+
+                                async function GetLocationData(Postcode){
+
+                                                var LocationData;
+
+                                                await $.get("//api.postcodes.io/postcodes/"+Postcode, function (data) {
+
+                                                                // data is the returned results, do whatever you want with it
+
+                                                                                                LocationData = data;
+
+                                                                                })
+
+                                                                                .done(function () {
+
+                                                                                                //alert( "second success" );
+
+                                                                                })
+
+                                                                                .fail(function (function( jqXHR, textStatus, errorThrown ) {
+
+                                                                                                console.log(jqXHR);
+
+                                                                                                console.log(textStatus);
+
+                                                                                                console.log(errorThrown );
+
+                                                                                })
+
+                                                                                .always(function () {
+
+                                                                                                //alert( "finished" );
+
+                                                                                })
+
+                                                return LocationData;
+
+                                }
+
+                               
+
+                                async function DeductRent(LocationRegion){
+
+                                                var averageRent = {
+
+                                                                cost: 0
+
+                                                };
+
+                                                if (LocationRegion =="London"){
+
+                                                                averageRent.cost = 2500;
+
+                                                }
+
+                                                else if (LocationRegion =="Bath"){
+
+                                                                averageRent.cost = 2333;
+
+                                                }
+
+                                                else if (LocationRegion   =="Hull"){
+
+                                                                averageRent.cost = 749;
+
+                                                }
+
+                                                else if (LocationRegion =="Bristol"){
+
+                                                                averageRent.cost = 785;
+
+                                                }
+
+                                                else{
+
+                                                                averageRent.cost =0
+
+                                                }
+
+                               
+
+                                                /*Costs money for api calls
+
+                                                var api_key = 'demo_mud8y7yhbsydug';
+
+                                                $.get(https://api.propertydata.co.uk/rents-hmo?key={+api_key+"}&postcode="+Postcode, function (data) {
+
+                                                                                                                // data is the returned results, do whatever you want with it
+
+                                                                                                                console.log(data);
+
+                                                                                                })
+
+                                                                                .done(function () {
+
+                                                                                                                //alert( "second success" );
+
+                                                                                                })
+
+                                                                                .fail(function (function( jqXHR, textStatus, errorThrown ) {
+
+                                                                                                console.log(jqXHR);
+
+                                                                                                console.log(textStatus);
+
+                                                                                                console.log(errorThrown );
+
+                                                                                                })
+
+                                                                                                .always(function () {
+
+                                                                                                                //alert( "finished" );
+
+                                                                                });*/
+
+                                                return averageRent;
+
+                                }
+
+                                function PercentageAmount(num, per)
+
+                                {
+
+                                  return (num*per)/100;
+
+                                }
+
+ 
+
+                </script>
+
+</head>
+
+<body>
+
+                <div id="accordion">
+
+                                <h3>Salary Checker</h3>
+
+                                <form>
+
+                                                <p>
+
+                                                                <label for="SubmissionDate">Submission Date</label>
+
+                                                                <input id="SubmissionDate" type="date"></input>
+
+                                                </p>
+
+                                                <p>
+
+                                                                <label for="Salary">Employee Yearly Salary £</label>
+
+                                                                <input id="Salary" type="text"></input>
+
+                                                </p>
+
+                                                <p>
+
+                                                                <label for="Postcode">Employee Postcode</label>
+
+                                                                <input id="Postcode" type="text"></input>
+
+                                                </p>
+
+                                               
+
+                                                <input id="submitsalary" type="button" onclick="SubmitSalaryMain()" value="Submit" />
+
+                                </form>
+
+                </div>  
+
+                <div id="ReturnForm">
+
+                <h3>Salary Summary</h3>
+
+                                <form>
+
+                                                <p class="">Pre-tax Salary Yearly:
+
+                                                                <span id="ReturnPreTax"></span></p>
+
+                                                <p class="">After Tax:</p>
+
+                                                                <span id="ReturnAfterTax"></span>
+
+                                                <p class="">After Rent:</p>
+
+                                                                <span id="ReturnAfterRent"></span>
+
+                                                <!--<p>After other expenses
+
+                                                                <div id="ReturnAfterOther"></div></p>-->
+
+                                                <p class="">Projected Monthly Inflation
+
+                                                                <span id="ReturnInflation"></span></p>
+
+                                                <p class="">Projected Change
+
+                                                                <span id="ReturnPrediction"></span></p>          
+
+                                </form>
+
+                </div>
+
+ 
+
+                <div id="ErrorText"></div>
+
+</body>
+
